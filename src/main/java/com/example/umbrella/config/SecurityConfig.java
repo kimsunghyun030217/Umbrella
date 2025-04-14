@@ -6,7 +6,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -14,6 +13,7 @@ public class SecurityConfig {
     // ✅ BCryptPasswordEncoder 빈 등록
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
+        //BCryptPasswordEncoder는 Spring Security에서 가장 널리 쓰이는 안전한 해시 방식
         return new BCryptPasswordEncoder();
     }
 
