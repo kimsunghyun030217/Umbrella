@@ -50,7 +50,7 @@ public class EmailService {
         mailSender.send(message);
     }
 
-
+//엥
 
     // ✅ 인증번호 검증
     public boolean verifyCode(String email, String inputCode) {
