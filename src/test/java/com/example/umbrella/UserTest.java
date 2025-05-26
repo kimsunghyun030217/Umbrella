@@ -1,6 +1,6 @@
 package com.example.umbrella;
 
-import com.example.umbrella.model.User;
+import com.example.umbrella.model.entity.User;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

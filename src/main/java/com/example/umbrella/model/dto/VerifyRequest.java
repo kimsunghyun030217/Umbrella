@@ -1,6 +1,8 @@
-package com.example.umbrella.model;
+//DTO(Request용) : 이메일로 받은 인증번호를 검증할 때 사용하는 요청 데이터
 
-public class VerifyResetCodeRequest {
+package com.example.umbrella.model.dto;
+
+public class VerifyRequest {
     private String email;
     private String code;
 

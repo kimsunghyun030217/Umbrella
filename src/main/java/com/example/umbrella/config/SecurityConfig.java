@@ -5,27 +5,28 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // ✅ BCryptPasswordEncoder 빈 등록
+    // ✅ 비밀번호 인코더 빈 등록
     @Bean
-    public BCryptPasswordEncoder passwordEncoder() {
-        //BCryptPasswordEncoder는 Spring Security에서 가장 널리 쓰이는 안전한 해시 방식
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // ✅ Spring Security 설정 (인증 해제)
+    // ✅ Spring Security 필터 체인 구성
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // 🔹 CSRF 보호 비활성화 (POST 요청 차단 방지)
+                .csrf(csrf -> csrf.disable()) // CSRF 비활성화 (테스트용)
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll() // 🔹 모든 요청을 인증 없이 허용 (테스트용)
+                        .anyRequest().permitAll() // 모든 요청 허용 (로그인 등 인증 필요 없음)
                 )
-                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())); // 🔹 H2 콘솔 사용 시 필요
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())); // H2 콘솔용
 
         return http.build();
     }

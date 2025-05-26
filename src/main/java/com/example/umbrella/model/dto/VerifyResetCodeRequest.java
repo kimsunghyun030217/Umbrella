@@ -1,10 +1,11 @@
-package com.example.umbrella.model;
+// DTO(Request용) : 비밀번호 재설정용 인증번호를 검증할 때 사용하는 요청 데이터
 
-public class VerifyRequest {
+package com.example.umbrella.model.dto;
+
+public class VerifyResetCodeRequest {
     private String email;
     private String code;
 
-    // 꼭 Getter & Setter 필요함!
     public String getEmail() {
         return email;
     }

@@ -1,52 +1,59 @@
 package com.example.umbrella.controller;
 
-import com.example.umbrella.model.ResetCodeRequest;
-import com.example.umbrella.model.ResetPasswordRequest;
-import com.example.umbrella.model.User;
-import com.example.umbrella.model.VerifyResetCodeRequest;
-import com.example.umbrella.service.AuthService;
-import lombok.RequiredArgsConstructor;
+import com.example.umbrella.model.entity.User;
+import com.example.umbrella.security.JwtUtil;
+import com.example.umbrella.service.UserService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
-@RequestMapping("/auth")
-@RequiredArgsConstructor
 public class AuthController {
-    private final AuthService authService;
 
-    // ✅ 회원가입 API
-    @PostMapping("/register")
-    public ResponseEntity<User> register(@RequestBody User user) {
-        User newUser = authService.registerUser(user.getEmail(), user.getStudentId(), user.getPassword());
-        return ResponseEntity.ok(newUser);
+    private final JwtUtil jwtUtil;
+    private final UserService userService;
+
+    public AuthController(JwtUtil jwtUtil, UserService userService) {
+        this.jwtUtil = jwtUtil;
+        this.userService = userService;
     }
 
-    // ✅ 비밀번호 재설정 인증번호 요청 API - JSON 방식
-    @PostMapping("/reset-password-request")
-    public ResponseEntity<String> sendResetCode(@RequestBody ResetCodeRequest request) {
-        authService.sendResetCode(request.getEmail());
-        return ResponseEntity.ok("인증번호가 이메일로 전송되었습니다.");
-    }
-
-    // ✅ 비밀번호 재설정 인증번호 확인 API - JSON 방식
-    @PostMapping("/verify-reset-code")
-    public ResponseEntity<String> verifyResetCode(@RequestBody VerifyResetCodeRequest request) {
-        boolean isValid = authService.verifyResetCode(request.getEmail(), request.getCode());
-        if (isValid) {
-            return ResponseEntity.ok("인증번호 확인 성공!");
-        } else {
-            return ResponseEntity.badRequest().body("인증번호가 올바르지 않습니다.");
+    @GetMapping("/profile")
+    public ResponseEntity<?> getProfile(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        // 1. 헤더 유효성 검사
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", "Authorization header missing or invalid")
+            );
         }
-    }
 
-    // ✅ 비밀번호 재설정 API - JSON 방식
-    @PostMapping("/reset-password")
-    public ResponseEntity<String> resetPassword(@RequestBody ResetPasswordRequest request) {
-        authService.resetPassword(request.getEmail(), request.getNewPassword());
-        return ResponseEntity.ok("비밀번호가 변경되었습니다.");
+        String token = authHeader.substring(7); // "Bearer " 이후 토큰
+        String id;
+        try {
+            id = jwtUtil.extractId(token);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", "사용자 정보 없음")
+            );
+        }
+
+        // 3. 사용자 조회
+        Optional<User> userOpt = userService.findByStudentId(id);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", "사용자 정보 없음")
+            );
+        }
+
+        User user = userOpt.get();
+        return ResponseEntity.ok(
+                Map.of(
+                        "id", user.getStudentId(),
+                        "name", user.getName(),
+                        "email", user.getEmail()
+                )
+        );
     }
 }
