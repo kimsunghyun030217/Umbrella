@@ -16,7 +16,8 @@ public class FirebaseInitializer {
     public void initialize() {
         try {
             // JSON 키 파일 경로 (로컬에서만 존재)
-            FileInputStream serviceAccount = new FileInputStream("src/main/resources/firebase/firebase-key.json");
+            FileInputStream serviceAccount = new FileInputStream("/home/ubuntu/Firebase_Admin_SDK.json");
+
 
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
