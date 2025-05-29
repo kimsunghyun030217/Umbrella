@@ -29,13 +29,15 @@ public class EmailController {
 
 
     // 1. 이메일 중복 확인 (회원가입 시 사용)
-    @GetMapping("/check-email")
-    public ResponseEntity<String> checkEmail(@RequestParam String email) {
+    @PostMapping("/check-email")
+    public ResponseEntity<String> checkEmail(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
         if (userService.isEmailExists(email)) {
             return ResponseEntity.badRequest().body("이미 가입한 이메일입니다.");
         }
         return ResponseEntity.ok("사용 가능한 이메일입니다.");
     }
+
 
     // 2. 인증번호 발송 (회원가입 / 비밀번호 재설정)
     @PostMapping(value = "/send-email", consumes = "application/json")
