@@ -7,12 +7,11 @@ import java.time.LocalDateTime;
 @Table(name = "umbrella")
 public class Umbrella {
 
-    @Id
-    @Column(name = "table_number")
-    private int tableNumber; // ✅ PK로 바뀜
+    @EmbeddedId
+    private UmbrellaId id;
 
     @Column(name = "umbrella_id", length = 50)
-    private String umbrellaId; // ✅ 일반 컬럼으로 변경됨
+    private String umbrellaId;
 
     @Column(name = "available", nullable = false)
     private boolean available;
@@ -20,28 +19,33 @@ public class Umbrella {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "locker_id")
-    private String lockerId;
+    public Umbrella() {}
 
-    public String getLockerId() {
-        return lockerId;
+    public Umbrella(UmbrellaId id, String umbrellaId, boolean available, LocalDateTime updatedAt) {
+        this.id = id;
+        this.umbrellaId = umbrellaId;
+        this.available = available;
+        this.updatedAt = updatedAt;
     }
 
-    public void setLockerId(String lockerId) {
-        this.lockerId = lockerId;
-    }
+    public UmbrellaId getId() { return id; }
+    public void setId(UmbrellaId id) { this.id = id; }
 
-
-    // Getters and Setters
     public String getUmbrellaId() { return umbrellaId; }
     public void setUmbrellaId(String umbrellaId) { this.umbrellaId = umbrellaId; }
-
-    public int getTableNumber() { return tableNumber; }
-    public void setTableNumber(int tableNumber) { this.tableNumber = tableNumber; }
 
     public boolean isAvailable() { return available; }
     public void setAvailable(boolean available) { this.available = available; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public int getTableNumber() {
+        return id.getTableNumber();
+    }
+
+    public String getLockerId() {
+        return id.getLockerId();
+    }
+
 }

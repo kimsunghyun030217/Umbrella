@@ -41,9 +41,10 @@ public class UserService {
     // ✅ 비밀번호 변경
     public void updatePassword(String email, String newPassword) {
         User user = userRepository.findByEmail(email).orElseThrow();
-        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPassword(newPassword); // ⚠️ 해시 없이 저장
         userRepository.save(user);
     }
+
 
     // ✅ 디바이스 토큰 업데이트
     public void updateDeviceToken(String studentId, String deviceToken) {

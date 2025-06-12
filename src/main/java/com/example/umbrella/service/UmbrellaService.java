@@ -3,13 +3,11 @@ package com.example.umbrella.service;
 import com.example.umbrella.model.dto.RentRequest;
 import com.example.umbrella.model.dto.ReturnRequest;
 import com.example.umbrella.model.dto.UmbrellaStatusResponse;
-import com.example.umbrella.model.entity.Rent;
-import com.example.umbrella.model.entity.RentHistory;
-import com.example.umbrella.model.entity.Umbrella;
-import com.example.umbrella.model.entity.User;
+import com.example.umbrella.model.entity.*;
 import com.example.umbrella.repository.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -21,24 +19,23 @@ public class UmbrellaService {
     private final UserRepository userRepository;
     private final UmbrellaRepository umbrellaRepository;
     private final RentRepository rentRepository;
-    private final HardwareService hardwareService;
     private final RentHistoryRepository rentHistoryRepository;
 
     public UmbrellaService(UserRepository userRepository,
                            UmbrellaRepository umbrellaRepository,
                            RentRepository rentRepository,
-                           RentHistoryRepository rentHistoryRepository,
-                           HardwareService hardwareService) {
+                           RentHistoryRepository rentHistoryRepository) {
         this.userRepository = userRepository;
         this.umbrellaRepository = umbrellaRepository;
         this.rentRepository = rentRepository;
         this.rentHistoryRepository = rentHistoryRepository;
-        this.hardwareService = hardwareService;
     }
 
+    @Transactional
     public String rentUmbrella(RentRequest request) {
         String studentId = request.getStudentId();
         int tableNumber = request.getTableNumber();
+        String lockerId = request.getLockerId();
 
         User user = userRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보가 없습니다."));
@@ -51,7 +48,8 @@ public class UmbrellaService {
             return "이미 우산을 대여 중입니다.";
         }
 
-        Umbrella umbrella = umbrellaRepository.findByTableNumber(tableNumber)
+        UmbrellaId umbrellaIdKey = new UmbrellaId(lockerId, tableNumber);
+        Umbrella umbrella = umbrellaRepository.findById(umbrellaIdKey)
                 .orElseThrow(() -> new IllegalArgumentException("해당 우산함에 우산이 없습니다."));
 
         if (!umbrella.isAvailable()) {
@@ -59,7 +57,6 @@ public class UmbrellaService {
         }
 
         String umbrellaId = umbrella.getUmbrellaId();
-
         umbrella.setUmbrellaId(null);
         umbrella.setAvailable(false);
         umbrella.setUpdatedAt(LocalDateTime.now());
@@ -73,17 +70,16 @@ public class UmbrellaService {
         rent.setStudentId(studentId);
         rentRepository.save(rent);
 
-        user.setPenaltyDueDate(LocalDateTime.now().plusHours(1));
+        user.setPenaltyDueDate(LocalDateTime.now().plusMinutes(1));
         userRepository.save(user);
-
-        hardwareService.unlock(tableNumber);
-
         return "우산 대여가 완료되었습니다.";
     }
 
+    @Transactional
     public String returnUmbrella(ReturnRequest request) {
         String studentId = request.getStudentId();
-        int returnTableNumber = request.getReturnTableNumber();
+        int tableNumber = request.getTableNumber(); // ✅ 바뀐 getter 사용
+        String lockerId = request.getLockerId();
 
         User user = userRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보가 없습니다."));
@@ -93,7 +89,6 @@ public class UmbrellaService {
 
         String rentedUmbrellaId = rent.getUmbrellaId();
         LocalDateTime now = LocalDateTime.now();
-
         rent.setReturnTime(now);
 
         if (user.getPenaltyDueDate() != null && now.isAfter(user.getPenaltyDueDate())) {
@@ -102,7 +97,8 @@ public class UmbrellaService {
         user.setPenaltyDueDate(null);
         userRepository.save(user);
 
-        Umbrella returnSlot = umbrellaRepository.findByTableNumber(returnTableNumber)
+        UmbrellaId returnId = new UmbrellaId(lockerId, tableNumber);
+        Umbrella returnSlot = umbrellaRepository.findById(returnId)
                 .orElseThrow(() -> new IllegalArgumentException("반납할 우산함 번호가 존재하지 않습니다."));
 
         if (returnSlot.getUmbrellaId() != null) {
@@ -122,22 +118,32 @@ public class UmbrellaService {
         rentHistoryRepository.save(history);
 
         rentRepository.delete(rent);
-        hardwareService.lock(returnTableNumber);
 
         return "우산 반납이 완료되었습니다.";
     }
 
-    public List<Integer> getAvailableReturnSlots() {
-        return umbrellaRepository.findByAvailableFalse().stream()
-                .map(Umbrella::getTableNumber)
+
+    public List<Integer> getAvailableReturnSlots(String lockerId) {
+        return umbrellaRepository.findById_LockerIdAndAvailableFalse(lockerId)
+                .stream()
+                .map(u -> u.getId().getTableNumber())
                 .toList();
     }
+
+    public List<Integer> getAvailableRentSlots(String lockerId) {
+        List<Umbrella> availableSlots = umbrellaRepository.findById_LockerIdAndAvailableTrue(lockerId);
+
+        return availableSlots.stream()
+                .map(Umbrella::getTableNumber)
+                .collect(Collectors.toList());
+    }
+
 
     public List<UmbrellaStatusResponse> getAllUmbrellaStatus() {
         return umbrellaRepository.findAll().stream()
                 .map(u -> new UmbrellaStatusResponse(
                         u.getUmbrellaId(),
-                        u.getTableNumber(),
+                        u.getId().getTableNumber(),
                         u.isAvailable()))
                 .toList();
     }
@@ -146,10 +152,10 @@ public class UmbrellaService {
         return umbrellaRepository.countByAvailableTrue();
     }
 
-    public List<Integer> getAvailableUmbrellaSlots() {
-        return umbrellaRepository.findByAvailableTrue()
+    public List<Integer> getAvailableUmbrellaSlots(String lockerId) {
+        return umbrellaRepository.findById_LockerIdAndAvailableTrue(lockerId)
                 .stream()
-                .map(Umbrella::getTableNumber)
+                .map(u -> u.getId().getTableNumber())
                 .toList();
     }
 
@@ -174,52 +180,34 @@ public class UmbrellaService {
         if (activeRent.isPresent()) {
             result.put("action", "return");
             result.put("message", "이미 대여 중입니다. 반납 후 다시 시도해주세요.");
-            result.put("roomId", lockerId); // 우산 반납할 우산함 정보 포함
+            result.put("locker_id", lockerId);
             return ResponseEntity.ok(result);
         }
 
         result.put("action", "rent");
         result.put("message", "대여 가능합니다.");
-        result.put("roomId", lockerId);
+        result.put("locker_id", lockerId);
         return ResponseEntity.ok(result);
     }
 
-
-    // ✅ 새로운 기능: 특정 우산함의 상태 조회
-    public Map<String, Object> getUmbrellaBoxStatus(int tableNumber) {
-        List<Umbrella> umbrellas = umbrellaRepository.findAllByTableNumber(tableNumber);
-
-
-        if (umbrellas == null || umbrellas.isEmpty()) {
-            return null;
-        }
-
-        int umbrellaCount = 0;
-        int emptySlotCount = 0;
-
-        for (Umbrella u : umbrellas) {
-            if (u.getUmbrellaId() != null) umbrellaCount++;
-            else emptySlotCount++;
-        }
+    public Map<String, Object> getLockerStatus(String lockerId) {
+        long count = umbrellaRepository.countById_LockerIdAndUmbrellaIdIsNotNull(lockerId);
 
         Map<String, Object> result = new HashMap<>();
-        result.put("umbrella", umbrellaCount);
-        result.put("emptySlot", emptySlotCount);
+        result.put("umbrellaCount", count);
         return result;
     }
 
     public List<Map<String, Object>> getAllLockerStatuses() {
         List<Umbrella> allUmbrellas = umbrellaRepository.findAll();
 
-        // lockerId -> 개수로 그룹핑
         Map<String, Long> lockerCountMap = allUmbrellas.stream()
-                .filter(u -> u.getUmbrellaId() != null) // 우산이 실제 존재하는 칸만 카운트
+                .filter(u -> u.getUmbrellaId() != null)
                 .collect(Collectors.groupingBy(
-                        Umbrella::getLockerId, // lockerId 기준 그룹
+                        u -> u.getId().getLockerId(),
                         Collectors.counting()
                 ));
 
-        // Map -> JSON 응답형태로 변환
         List<Map<String, Object>> response = new ArrayList<>();
         for (String lockerId : lockerCountMap.keySet()) {
             Map<String, Object> item = new HashMap<>();
@@ -231,13 +219,19 @@ public class UmbrellaService {
         return response;
     }
 
-    public Map<String, Object> getLockerStatus(String lockerId) {
-        long count = umbrellaRepository.countByLockerIdAndUmbrellaIdIsNotNull(lockerId); // 실제 우산이 있는 칸만 카운트
+    public Map<String, Object> getUmbrellaBoxStatus(String lockerId, int tableNumber) {
+        UmbrellaId id = new UmbrellaId(lockerId, tableNumber);
+        Optional<Umbrella> optional = umbrellaRepository.findById(id);
+
+        if (optional.isEmpty()) return null;
+
+        Umbrella umbrella = optional.get();
 
         Map<String, Object> result = new HashMap<>();
-        result.put("umbrellaCount", count);
+        result.put("umbrellaId", umbrella.getUmbrellaId());
+        result.put("available", umbrella.isAvailable());
+        result.put("updatedAt", umbrella.getUpdatedAt());
+
         return result;
     }
-
-
 }

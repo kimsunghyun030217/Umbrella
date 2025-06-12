@@ -32,7 +32,7 @@ public class UmbrellaController {
     }
 
 
-    @PostMapping("/locker-status")
+    @PostMapping("/user_check_availability")
     public ResponseEntity<Map<String, Object>> checkLockerStatus(
             @RequestHeader("Authorization") String authHeader,
             @RequestBody LockerRequest request) {
@@ -63,23 +63,39 @@ public class UmbrellaController {
 
     @PostMapping("/return")
     public ResponseEntity<String> returnUmbrella(@RequestBody ReturnRequest request) {
-        String result = umbrellaService.returnUmbrella(request);
-        return ResponseEntity.ok(result);
+        try {
+            String result = umbrellaService.returnUmbrella(request);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("서버 오류: " + e.getMessage());
+        }
     }
+
 
     @GetMapping("/return/slots")
-    public ResponseEntity<List<Integer>> getReturnableSlots() {
-        return ResponseEntity.ok(umbrellaService.getAvailableReturnSlots());
+    public ResponseEntity<List<Integer>> getReturnableSlots(@RequestParam("lockerId") String lockerId) {
+        return ResponseEntity.ok(umbrellaService.getAvailableReturnSlots(lockerId));
     }
 
+    @GetMapping("/rent/slots")
+    public ResponseEntity<List<Integer>> getRentableSlots(@RequestParam("lockerId") String lockerId) {
+        return ResponseEntity.ok(umbrellaService.getAvailableRentSlots(lockerId));
+    }
+
+
+
     @GetMapping("/status")
-    public ResponseEntity<?> getUmbrellaBoxStatus(@RequestParam("id") int tableNumber) {
-        Map<String, Object> status = umbrellaService.getUmbrellaBoxStatus(tableNumber);
+    public ResponseEntity<?> getUmbrellaBoxStatus(
+            @RequestParam("lockerId") String lockerId,
+            @RequestParam("tableNumber") int tableNumber) {
+
+        Map<String, Object> status = umbrellaService.getUmbrellaBoxStatus(lockerId, tableNumber);
         if (status == null) {
             return ResponseEntity.status(404).body(Map.of("message", "해당 우산함을 찾을 수 없습니다."));
         }
         return ResponseEntity.ok(status);
     }
+
 
     @GetMapping("/lockers/status")
     public ResponseEntity<?> getAllLockerStatuses() {

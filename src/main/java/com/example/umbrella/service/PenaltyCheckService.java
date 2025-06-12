@@ -23,7 +23,7 @@ public class PenaltyCheckService {
     }
 
 
-    @Scheduled(cron = "0 0 9 * * *")
+    @Scheduled(cron = "0 0 1 * * *")
     public void sendPenaltyNotification() {
         LocalDateTime now = LocalDateTime.now();
         List<User> overdueUsers = userRepository.findByPenaltyDueDateBefore(now);

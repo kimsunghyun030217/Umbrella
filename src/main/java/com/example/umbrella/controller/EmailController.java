@@ -91,18 +91,6 @@ public class EmailController {
         }
     }
 
-    // 4. 비밀번호 재설정
-    @PostMapping("/reset-password")
-    public ResponseEntity<String> resetPassword(@RequestBody ResetPasswordRequest request) {
-        if (!userService.isEmailExists(request.getEmail())) {
-            return ResponseEntity.status(404).body("Email not found");
-        }
-
-        userService.updatePassword(request.getEmail(), request.getNewPassword());
-        return ResponseEntity.ok("비밀번호가 성공적으로 변경되었습니다.");
-    }
-
-
     @PostMapping("/changePw-verify-code")
     public ResponseEntity<?> issueTempToken(@RequestBody VerifyRequest request) {
         String email = request.getEmail();

@@ -16,9 +16,12 @@ public class Rent {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    // ✅ 우산 연결은 table_number로 (nullable 허용 가능)
+    // ✅ 복합키 조인
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "table_number", referencedColumnName = "table_number")
+    @JoinColumns({
+            @JoinColumn(name = "locker_id", referencedColumnName = "locker_id", nullable = false),
+            @JoinColumn(name = "table_number", referencedColumnName = "table_number", nullable = false)
+    })
     private Umbrella umbrella;
 
     @Column(name = "rent_time", nullable = false)
@@ -30,11 +33,10 @@ public class Rent {
     @Column(name = "student_id")
     private String studentId;
 
-    // ✅ 이제 값 저장도 가능
     @Column(name = "umbrella_id")
     private String umbrellaId;
 
-    // Getter & Setter
+    // Getters & Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
