@@ -22,8 +22,9 @@ public class PenaltyCheckService {
         this.fcmService = fcmService;
     }
 
+    @Scheduled(cron = "0 0 9 * * *")
 
-    @Scheduled(cron = "0 0 1 * * *")
+    // @Scheduled(fixedRate = 60000) 1분마다 전송
     public void sendPenaltyNotification() {
         LocalDateTime now = LocalDateTime.now();
         List<User> overdueUsers = userRepository.findByPenaltyDueDateBefore(now);
