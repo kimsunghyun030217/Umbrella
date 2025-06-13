@@ -3,11 +3,12 @@ package com.example.umbrella.controller;
 import com.example.umbrella.model.dto.*;
 import com.example.umbrella.model.entity.User;
 import com.example.umbrella.repository.UserRepository;
-import com.example.umbrella.service.UmbrellaService;
 import com.example.umbrella.security.JwtUtil;
+import com.example.umbrella.service.UmbrellaService;
+import com.example.umbrella.service.WebSocketService;
+import com.example.umbrella.model.dto.WebSocketNfcResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,18 +21,22 @@ public class UmbrellaController {
 
     private final UmbrellaService umbrellaService;
     private final JwtUtil jwtUtil;
-
     private final UserRepository userRepository;
+    private final WebSocketService webSocketService; // ✅ 추가
 
-
-
-    public UmbrellaController(UmbrellaService umbrellaService, JwtUtil jwtUtil, UserRepository userRepository) {
+    public UmbrellaController(
+            UmbrellaService umbrellaService,
+            JwtUtil jwtUtil,
+            UserRepository userRepository,
+            WebSocketService webSocketService
+    ) {
         this.umbrellaService = umbrellaService;
         this.jwtUtil = jwtUtil;
         this.userRepository = userRepository;
+        this.webSocketService = webSocketService;
     }
 
-
+    // ✅ NFC 태깅 → 대여 가능 여부 + WebSocket 전송
     @PostMapping("/user_check_availability")
     public ResponseEntity<Map<String, Object>> checkLockerStatus(
             @RequestHeader("Authorization") String authHeader,
@@ -43,17 +48,24 @@ public class UmbrellaController {
 
         String token = authHeader.substring(7);
         String studentId;
-
         try {
-            studentId = jwtUtil.extractId(token);  // 토큰에서 studentId 추출
+            studentId = jwtUtil.extractId(token);
         } catch (Exception e) {
             return ResponseEntity.status(400).body(Map.of("message", "Invalid token"));
         }
 
-        return umbrellaService.checkUserUmbrellaStatus(studentId, request.getLockerId());
+        // 대여 가능 여부 판단
+        ResponseEntity<Map<String, Object>> response = umbrellaService.checkUserUmbrellaStatus(studentId, request.getLockerId());
+
+        // WebSocket 알림 전송
+        boolean canRent = Boolean.TRUE.equals(response.getBody().get("canRent"));
+        String mode = canRent ? "rent" : "return";
+        String msg = canRent ? "대여 가능합니다" : "반납 가능합니다";
+
+        webSocketService.sendLockerNotification(request.getLockerId(), new WebSocketNfcResponse(mode, msg));
+
+        return response;
     }
-
-
 
     @PostMapping("/rent")
     public ResponseEntity<String> rentUmbrella(@RequestBody RentRequest request) {
@@ -71,7 +83,6 @@ public class UmbrellaController {
         }
     }
 
-
     @GetMapping("/return/slots")
     public ResponseEntity<List<Integer>> getReturnableSlots(@RequestParam("lockerId") String lockerId) {
         return ResponseEntity.ok(umbrellaService.getAvailableReturnSlots(lockerId));
@@ -81,8 +92,6 @@ public class UmbrellaController {
     public ResponseEntity<List<Integer>> getRentableSlots(@RequestParam("lockerId") String lockerId) {
         return ResponseEntity.ok(umbrellaService.getAvailableRentSlots(lockerId));
     }
-
-
 
     @GetMapping("/status")
     public ResponseEntity<?> getUmbrellaBoxStatus(
@@ -96,7 +105,6 @@ public class UmbrellaController {
         return ResponseEntity.ok(status);
     }
 
-
     @GetMapping("/lockers/status")
     public ResponseEntity<?> getAllLockerStatuses() {
         return ResponseEntity.ok(umbrellaService.getAllLockerStatuses());
@@ -104,11 +112,8 @@ public class UmbrellaController {
 
     @GetMapping("/locker/{lockerId}/status")
     public ResponseEntity<?> getLockerStatus(@PathVariable String lockerId) {
-        Map<String, Object> status = umbrellaService.getLockerStatus(lockerId);
-        return ResponseEntity.ok(status); // 항상 성공으로 간주하고 개수 0도 응답
+        return ResponseEntity.ok(umbrellaService.getLockerStatus(lockerId));
     }
-
-
 
     @GetMapping("/overdue")
     public ResponseEntity<?> checkOverdue(@RequestHeader(value = "Authorization", required = false) String authHeader) {
@@ -132,23 +137,17 @@ public class UmbrellaController {
         User user = optionalUser.get();
         LocalDateTime now = LocalDateTime.now();
 
-        // ✅ 연체 판단
-        if (user.getPenaltyDueDate() != null && user.getPenaltyDueDate().isBefore(now)) {
-            // 연체 중
+        boolean isOverdue = user.getPenaltyBanUntil() != null && user.getPenaltyBanUntil().isAfter(now);
+
+        if (isOverdue) {
             return ResponseEntity.ok(Map.of(
                     "isOverdue", true,
-                    "releaseDate", user.getPenaltyDueDate().toString()
+                    "releaseDate", user.getPenaltyBanUntil().toString()  // ISO 포맷으로 반환
             ));
+        } else {
+            return ResponseEntity.ok(Map.of("isOverdue", false));
         }
-
-        // 연체 아님
-        return ResponseEntity.ok(Map.of(
-                "isOverdue", false
-        ));
     }
-
-
-
 
 
 }

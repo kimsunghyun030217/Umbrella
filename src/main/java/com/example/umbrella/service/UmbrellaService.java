@@ -91,11 +91,21 @@ public class UmbrellaService {
         LocalDateTime now = LocalDateTime.now();
         rent.setReturnTime(now);
 
-        if (user.getPenaltyDueDate() != null && now.isAfter(user.getPenaltyDueDate())) {
-            user.setPenaltyBanUntil(now.plusDays(3));
+        if (user.getPenaltyDueDate() != null) {
+            if (now.isAfter(user.getPenaltyDueDate())) {
+                // ❌ 연체 반납 → 3일 대여 정지
+                user.setPenaltyBanUntil(now.plusDays(3));
+                System.out.println("❌ 연체 반납 → 대여 정지 처리됨 (until: " + user.getPenaltyBanUntil() + ")");
+            } else {
+                // ✅ 정시 반납 → 벌점 없음
+                System.out.println("✅ 정시 반납 → 대여 정지 없음");
+            }
+
+            // 벌점 유예기한은 반납 시 무조건 초기화
+            user.setPenaltyDueDate(null);
+            userRepository.save(user);
         }
-        user.setPenaltyDueDate(null);
-        userRepository.save(user);
+
 
         UmbrellaId returnId = new UmbrellaId(lockerId, tableNumber);
         Umbrella returnSlot = umbrellaRepository.findById(returnId)
