@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,18 +55,34 @@ public class UmbrellaController {
             return ResponseEntity.status(400).body(Map.of("message", "Invalid token"));
         }
 
-        // 대여 가능 여부 판단
+        // ✅ 대여 가능 여부 판단
         ResponseEntity<Map<String, Object>> response = umbrellaService.checkUserUmbrellaStatus(studentId, request.getLockerId());
 
-        // WebSocket 알림 전송
-        boolean canRent = Boolean.TRUE.equals(response.getBody().get("canRent"));
-        String mode = canRent ? "rent" : "return";
-        String msg = canRent ? "대여 가능합니다" : "반납 가능합니다";
+        // ✅ 로그 추가
+        String action = (String) response.getBody().get("action");
+        System.out.println("📦 checkUserUmbrellaStatus → action = " + action);
 
-        webSocketService.sendLockerNotification(request.getLockerId(), new WebSocketNfcResponse(mode, msg));
+        String msg;
+        switch (action) {
+            case "rent" -> msg = "대여 가능합니다";
+            case "return" -> msg = "반납 가능합니다";
+            case "banned" -> msg = "연체로 인해 대여가 제한됩니다";
+            default -> msg = "상태를 알 수 없습니다";
+        }
 
-        return response;
+        // ✅ WebSocket에는 action만 전송
+        webSocketService.sendLockerNotification(request.getLockerId(), action);
+
+        // ✅ 앱에는 자세한 응답 반환
+        Map<String, Object> result = new HashMap<>();
+        result.put("locker_id", request.getLockerId());
+        result.put("action", action);
+        result.put("message", msg);
+        return ResponseEntity.ok(result);
     }
+
+
+
 
     @PostMapping("/rent")
     public ResponseEntity<String> rentUmbrella(@RequestBody RentRequest request) {

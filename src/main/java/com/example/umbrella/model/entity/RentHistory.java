@@ -65,4 +65,6 @@ public class RentHistory {
     public void setReturnTime(LocalDateTime returnTime) {
         this.returnTime = returnTime;
     }
+
+
 }

@@ -16,12 +16,16 @@ public class WebSocketService {
         this.objectMapper = objectMapper;
     }
 
-    public void sendLockerNotification(String lockerId, WebSocketNfcResponse response) {
+    public void sendLockerNotification(String lockerId, String actionOnly) {
         try {
-            String json = objectMapper.writeValueAsString(response);
-            webSocketHandler.sendToLocker(lockerId, json);
+            // 따옴표 없이 순수 문자열만 전송
+            System.out.println("📦 텍스트 알림 전송: " + actionOnly);
+            webSocketHandler.sendToLocker(lockerId, actionOnly);  // ← JSON 아님, 그냥 "rent"
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
+
+
 }

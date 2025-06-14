@@ -72,13 +72,16 @@ public class UmbrellaService {
 
         user.setPenaltyDueDate(LocalDateTime.now().plusMinutes(1));
         userRepository.save(user);
+
+        System.out.println("✅ 대여 처리됨: studentId=" + studentId + ", umbrellaId=" + umbrellaId);
+
         return "우산 대여가 완료되었습니다.";
     }
 
     @Transactional
     public String returnUmbrella(ReturnRequest request) {
         String studentId = request.getStudentId();
-        int tableNumber = request.getTableNumber(); // ✅ 바뀐 getter 사용
+        int tableNumber = request.getTableNumber();
         String lockerId = request.getLockerId();
 
         User user = userRepository.findByStudentId(studentId)
@@ -93,19 +96,14 @@ public class UmbrellaService {
 
         if (user.getPenaltyDueDate() != null) {
             if (now.isAfter(user.getPenaltyDueDate())) {
-                // ❌ 연체 반납 → 3일 대여 정지
                 user.setPenaltyBanUntil(now.plusDays(3));
                 System.out.println("❌ 연체 반납 → 대여 정지 처리됨 (until: " + user.getPenaltyBanUntil() + ")");
             } else {
-                // ✅ 정시 반납 → 벌점 없음
                 System.out.println("✅ 정시 반납 → 대여 정지 없음");
             }
-
-            // 벌점 유예기한은 반납 시 무조건 초기화
             user.setPenaltyDueDate(null);
             userRepository.save(user);
         }
-
 
         UmbrellaId returnId = new UmbrellaId(lockerId, tableNumber);
         Umbrella returnSlot = umbrellaRepository.findById(returnId)
@@ -129,9 +127,10 @@ public class UmbrellaService {
 
         rentRepository.delete(rent);
 
+        System.out.println("✅ 반납 처리됨: studentId=" + studentId + ", umbrellaId=" + rentedUmbrellaId);
+
         return "우산 반납이 완료되었습니다.";
     }
-
 
     public List<Integer> getAvailableReturnSlots(String lockerId) {
         return umbrellaRepository.findById_LockerIdAndAvailableFalse(lockerId)
@@ -147,7 +146,6 @@ public class UmbrellaService {
                 .map(Umbrella::getTableNumber)
                 .collect(Collectors.toList());
     }
-
 
     public List<UmbrellaStatusResponse> getAllUmbrellaStatus() {
         return umbrellaRepository.findAll().stream()
@@ -180,13 +178,27 @@ public class UmbrellaService {
 
         User user = optionalUser.get();
 
+        // ✅ 연체 확인
         if (user.getPenaltyBanUntil() != null && user.getPenaltyBanUntil().isAfter(LocalDateTime.now())) {
             result.put("action", "banned");
             result.put("message", "연체로 인해 대여가 제한됩니다.");
             return ResponseEntity.ok(result);
         }
 
+        // ✅ 대여 중 여부 확인
         Optional<Rent> activeRent = rentRepository.findByUserAndReturnTimeIsNull(user);
+
+        System.out.println("🔍 studentId: " + studentId);
+        System.out.println("🔍 user.id: " + user.getId());
+        System.out.println("🔍 activeRent.isPresent: " + activeRent.isPresent());
+
+        activeRent.ifPresent(r -> {
+            System.out.println("🧾 rent_id: " + r.getId());
+            System.out.println("🧾 umbrella_id: " + r.getUmbrellaId());
+            System.out.println("🧾 rent_time: " + r.getRentTime());
+            System.out.println("🧾 return_time: " + r.getReturnTime());
+        });
+
         if (activeRent.isPresent()) {
             result.put("action", "return");
             result.put("message", "이미 대여 중입니다. 반납 후 다시 시도해주세요.");
@@ -194,11 +206,13 @@ public class UmbrellaService {
             return ResponseEntity.ok(result);
         }
 
+        // ✅ 대여 가능
         result.put("action", "rent");
         result.put("message", "대여 가능합니다.");
         result.put("locker_id", lockerId);
         return ResponseEntity.ok(result);
     }
+
 
     public Map<String, Object> getLockerStatus(String lockerId) {
         long count = umbrellaRepository.countById_LockerIdAndUmbrellaIdIsNotNull(lockerId);
