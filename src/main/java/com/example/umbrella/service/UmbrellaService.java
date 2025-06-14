@@ -70,7 +70,7 @@ public class UmbrellaService {
         rent.setStudentId(studentId);
         rentRepository.save(rent);
 
-        user.setPenaltyDueDate(LocalDateTime.now().plusMinutes(1));
+        user.setPenaltyDueDate(LocalDateTime.now().plusDays(3));
         userRepository.save(user);
 
         System.out.println("✅ 대여 처리됨: studentId=" + studentId + ", umbrellaId=" + umbrellaId);
